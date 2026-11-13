@@ -14,10 +14,17 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Export Templates
+      - name: Cek Posisi Template & Versi Godot
         run: |
-          mkdir -v -p ~/.local/share/godot/export_templates/
-          mv /root/.local/share/godot/export_templates/4.3.stable ~/.local/share/godot/export_templates/4.3.stable
+          echo "=== Versi Godot ==="
+          godot --version
+          echo "=== Isi Folder Template ==="
+          ls -la /root/.local/share/godot/export_templates/ || echo "Folder root tidak ada"
+
+      - name: Copy Export Templates
+        run: |
+          mkdir -p ~/.local/share/godot/export_templates/
+          cp -r /root/.local/share/godot/export_templates/* ~/.local/share/godot/export_templates/ || echo "Gagal copy, lanjut aja dulu"
 
       - name: Generate Debug Keystore
         run: |
