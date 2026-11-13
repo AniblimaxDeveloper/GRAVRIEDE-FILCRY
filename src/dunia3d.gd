@@ -4,6 +4,7 @@ var rotation_x = 0.0
 var rotation_y = 0.0
 var player_node = null
 var camera = null
+var is_walking = false
 
 func _ready():
     # 1. Lantai
@@ -18,7 +19,7 @@ func _ready():
     var mesh_kotak = BoxMesh.new()
     mesh_kotak.size = Vector3(2, 3, 2)
     kotak.mesh = mesh_kotak
-    kotak.position = Vector3(0, 1.5, -10) # Taruh agak jauh
+    kotak.position = Vector3(0, 1.5, -15) 
     var material = StandardMaterial3D.new()
     material.albedo_color = Color(1, 0.2, 0.2)
     kotak.material_override = material
@@ -41,7 +42,7 @@ func _ready():
 
 # Fungsi mendeteksi sentuhan di layar HP
 func _input(event):
-    # Jika layar digeser (untuk melihat sekeliling)
+    # Jika layar digeser (Lihat sekeliling)
     if event is InputEventScreenDrag:
         rotation_y -= event.relative.x * 0.005
         rotation_x -= event.relative.y * 0.005
@@ -49,9 +50,17 @@ func _input(event):
         
         player_node.rotation = Vector3(0, rotation_y, 0)
         camera.rotation = Vector3(rotation_x, 0, 0)
+        
+    # Jika layar ditahan (Jalan maju)
+    elif event is InputEventScreenTouch:
+        if event.pressed:
+            is_walking = true
+        else:
+            is_walking = false
 
-# Fungsi gerak otomatis maju (karena kita belum bikin joystick)
+# Fungsi gerak
 func _process(delta):
-    # Player akan selalu berjalan maju perlahan
-    var speed = 3.0
-    player_node.position.z -= speed * delta
+    if is_walking:
+        var speed = 4.0
+        var arah_maju = player_node.transform.basis.z 
+        player_node.position -= arah_maju * speed * delta
