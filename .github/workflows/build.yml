@@ -1,5 +1,4 @@
 name: Build Android APK
-
 on:
   push:
     branches: [ "main", "utama" ]
@@ -19,11 +18,22 @@ jobs:
           mkdir -v -p ~/.local/share/godot/export_templates/
           mv /root/.local/share/godot/export_templates/4.3.stable ~/.local/share/godot/export_templates/4.3.stable
 
-      - name: Export APK
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
+          build-tools: '33.0.2'
+
+      - name: Install Android Build Template & Export APK
         run: |
           mkdir -p build
-          # Perintah ekspor menggunakan Godot di dalam Docker
-          godot --headless --export-debug "Android" build/GRAVRIEDE-FILCRY.apk
+          godot --headless --verbose --import --install-android-build-template --export-debug "Android" build/GRAVRIEDE-FILCRY.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
