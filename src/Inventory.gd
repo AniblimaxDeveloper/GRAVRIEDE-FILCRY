@@ -8,34 +8,34 @@ signal item_used(item_name)
 var items: Dictionary = {}
 
 func add_item(item_name: String, amount: int = 1) -> bool:
-if items.size() >= max_slots and not items.has(item_name):
-print("Inventory penuh!")
-return false
-
-if items.has(item_name):
-items[item_name] += amount
-else:
-items[item_name] = amount
-
-emit_signal("item_added", item_name, amount)
-print("Ditambahkan: ", item_name, " (", amount, ")")
-return true
+    if items.size() >= max_slots and not items.has(item_name):
+        print("Inventory penuh!")
+        return false
+        
+    if items.has(item_name):
+        items[item_name] += amount
+    else:
+        items[item_name] = amount
+        
+    emit_signal("item_added", item_name, amount)
+    print("Ditambahkan: ", item_name, " (", amount, ")")
+    return true
 
 func remove_item(item_name: String, amount: int = 1):
-if items.has(item_name):
-items[item_name] -= amount
-if items[item_name] <= 0:
-items.erase(item_name)
-emit_signal("item_removed", item_name, amount)
-print("Dibuang: ", item_name)
+    if items.has(item_name):
+        items[item_name] -= amount
+        if items[item_name] <= 0:
+            items.erase(item_name)
+        emit_signal("item_removed", item_name, amount)
+        print("Dibuang: ", item_name)
 
 func use_item(item_name: String):
-if items.has(item_name) and items[item_name] > 0:
-print("Menggunakan item: ", item_name)
-emit_signal("item_used", item_name)
-remove_item(item_name, 1)
-else:
-print("Item tidak ditemukan: ", item_name)
+    if items.has(item_name) and items[item_name] > 0:
+        print("Menggunakan item: ", item_name)
+        emit_signal("item_used", item_name)
+        remove_item(item_name, 1)
+    else:
+        print("Item tidak ditemukan: ", item_name)
 
 func get_item_count(item_name: String) -> int:
-return items.get(item_name, 0)
+    return items.get(item_name, 0)

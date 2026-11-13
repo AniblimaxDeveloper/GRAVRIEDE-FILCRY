@@ -12,26 +12,26 @@ var is_in_darkness: bool = false
 var is_near_monster: bool = false
 
 func _process(delta):
-if current_sanity > 0:
-var total_drain = 0.0
-
-if is_in_darkness:
-total_drain += drain_rate_darkness
-
-if is_near_monster:
-total_drain += drain_rate_near_monster
-
-if total_drain > 0:
-current_sanity -= total_drain * delta
-current_sanity = clamp(current_sanity, 0, max_sanity)
-emit_signal("sanity_changed", current_sanity)
-
-if current_sanity < 30.0 and randf() < 0.01:
-emit_signal("hallucination_triggered")
-print("HALUSINASI: Kamu mendengar suara aneh...")
-
-if current_sanity <= 0:
-die_from_insanity()
+    if current_sanity > 0:
+        var total_drain = 0.0
+        
+        if is_in_darkness:
+            total_drain += drain_rate_darkness
+            
+        if is_near_monster:
+            total_drain += drain_rate_near_monster
+            
+        if total_drain > 0:
+            current_sanity -= total_drain * delta
+            current_sanity = clamp(current_sanity, 0, max_sanity)
+            emit_signal("sanity_changed", current_sanity)
+            
+            if current_sanity < 30.0 and randf() < 0.01:
+                emit_signal("hallucination_triggered")
+                print("HALUSINASI: Kamu mendengar suara aneh...")
+                
+    if current_sanity <= 0:
+        die_from_insanity()
 
 func die_from_insanity():
-print("Player mati karena kehilangan kewarasan (Gila)!")
+    print("Player mati karena kehilangan kewarasan (Gila)!")

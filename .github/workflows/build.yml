@@ -19,11 +19,14 @@ jobs:
           mkdir -v -p ~/.local/share/godot/export_templates/
           mv /root/.local/share/godot/export_templates/4.3.stable ~/.local/share/godot/export_templates/4.3.stable
 
+      - name: Generate Debug Keystore
+        run: |
+          keytool -keyalg RSA -genkeypair -alias androiddebugkey -keypass android -keystore debug.keystore -storepass android -dname "CN=Android Debug,O=Android,C=US" -validity 9999 -deststoretype pkcs12
+
       - name: Export APK
         run: |
           mkdir -p build
-          # Menyuntikkan path Android SDK langsung ke Godot agar tidak error
-          godot --headless --verbose --editor-settings "export/android/android_sdk_path=/opt/android-sdk" --export-debug "Android" build/GRAVRIEDE-FILCRY.apk
+          godot --headless --verbose --export-debug "Android" build/GRAVRIEDE-FILCRY.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
