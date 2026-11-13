@@ -3,6 +3,7 @@ config_version=5
 [application]
 config/name="GRAVRIEDE FILCRY"
 run/main_scene="res://src/dunia3d.tscn"
+config/icon="res://icon.png"
 boot_splash/show_image=false
 
 [rendering]
