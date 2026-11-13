@@ -15,7 +15,6 @@ var loker = null
 var medkit = null
 var generator = null
 var daftar_sekring = []
-var daftar_catatan = []
 var daftar_pintu = []
 
 # Joystick & UI
@@ -31,7 +30,6 @@ var bar_baterai = null
 var ui_objektif = null
 var ui_jumpscare = null
 var ui_damage = null
-var ui_lore = null
 
 # Stats
 var health = 100.0
@@ -56,13 +54,10 @@ var batu_dilempar = null
 var batu_pos = Vector3.ZERO
 
 # Audio
-var audio_player = null
-var playback = null
 var heart_timer = 0.0
-var growl_timer = 0.0
 
 func _ready():
-# 1. Lingkungan & Kabut
+# 1. Lingkungan
 var env = Environment.new()
 env.background_mode = Environment.BG_COLOR
 env.background_color = Color(0, 0, 0)
@@ -73,21 +68,12 @@ var world_env = WorldEnvironment.new()
 world_env.environment = env
 add_child(world_env)
 
-# 2. Setup Audio
-audio_player = AudioStreamPlayer.new()
-var generator_audio = AudioStreamGenerator.new()
-generator_audio.mix_rate = 22050 
-audio_player.stream = generator_audio
-add_child(audio_player)
-audio_player.play()
-playback = audio_player.get_stream_playback()
-
-# 3. Map & Player
+# 2. Map & Player (Dimuat duluan agar kamera langsung aktif)
 _buat_lantai()
 _buat_labirin_dfs()
 
 player = CharacterBody3D.new()
-player.position = Vector3(0, 1.5, 0)
+player.position = Vector3(0, 2, 0)
 var col_player = CollisionShape3D.new()
 col_player.shape = CapsuleShape3D.new()
 player.add_child(col_player)
@@ -104,59 +90,41 @@ senter.spot_angle = 30.0
 senter.visible = false 
 camera.add_child(senter)
 
-# 4. Spawn Monsters
-monster = _buat_monster(Color(0.8, 0, 0), _cari_posisi_kosong())
-mimic = _buat_monster(Color(0, 0.2, 0.8), _cari_posisi_kosong())
-patung = _buat_monster(Color(0.5, 0.5, 0.5), _cari_posisi_kosong())
-monster_buta = _buat_monster(Color(1, 1, 1), _cari_posisi_kosong())
-
-# 5. Objek Utama
-pintu_keluar = _buat_item(Vector3(0, 2, -45), Color(0, 1, 0), Vector3(6, 6, 1)) 
-generator = _buat_item(_cari_posisi_kosong(), Color(1, 1, 0), Vector3(2, 2, 2))
-loker = _buat_item(_cari_posisi_kosong(), Color(0, 0.5, 1), Vector3(2, 4, 2))
-medkit = _buat_item(_cari_posisi_kosong(), Color(1, 1, 1), Vector3(0.5, 0.5, 0.5))
-
-# 6. Spawn Sekring, Catatan, dan Pintu
-for i in range(3):
-daftar_sekring.append(_buat_item(_cari_posisi_kosong(), Color(1, 0, 0), Vector3(0.5, 0.5, 0.5)))
-
-for i in range(4):
-_buat_pintu(_cari_posisi_kosong())
-
-# 7. Cahaya
+# 3. Cahaya
 var cahaya = DirectionalLight3D.new()
 cahaya.name = "CahayaUtama"
 cahaya.rotation_degrees = Vector3(-45, -30, 0)
 cahaya.light_energy = 0.05
 add_child(cahaya)
 
+# 4. UI dimuat duluan
 _setup_ui()
 
-func _buat_pintu(pos):
-var pintu = StaticBody3D.new()
-pintu.position = pos
-var col = CollisionShape3D.new()
-var shape = BoxShape3D.new()
-shape.size = Vector3(4, 4, 0.5)
-col.shape = shape
-pintu.add_child(col)
+# 5. Spawn Entitas secara Tertunda (Deferred) agar tidak freeze
+_spawn_semua_entitas.call_deferred()
 
-var mesh = MeshInstance3D.new()
-var box = BoxMesh.new()
-box.size = Vector3(4, 4, 0.5)
-mesh.mesh = box
-var mat = StandardMaterial3D.new()
-mat.albedo_color = Color(0.4, 0.2, 0.1) # Warna kayu
-mesh.material_override = mat
-pintu.add_child(mesh)
+func _spawn_semua_entitas():
+# Monster
+monster = _buat_monster(Color(0.8, 0, 0), _cari_posisi_kosong())
+mimic = _buat_monster(Color(0, 0.2, 0.8), _cari_posisi_kosong())
+patung = _buat_monster(Color(0.5, 0.5, 0.5), _cari_posisi_kosong())
+monster_buta = _buat_monster(Color(1, 1, 1), _cari_posisi_kosong())
 
-pintu.set_meta("is_pintu", true)
-pintu.set_meta("terbuka", false)
-add_child(pintu)
-daftar_pintu.append(pintu)
+# Objek Utama
+pintu_keluar = _buat_item(Vector3(0, 2, -25), Color(0, 1, 0), Vector3(6, 6, 1)) 
+generator = _buat_item(_cari_posisi_kosong(), Color(1, 1, 0), Vector3(2, 2, 2))
+loker = _buat_item(_cari_posisi_kosong(), Color(0, 0.5, 1), Vector3(2, 4, 2))
+medkit = _buat_item(_cari_posisi_kosong(), Color(1, 1, 1), Vector3(0.5, 0.5, 0.5))
+
+# Item Kecil
+for i in range(3):
+daftar_sekring.append(_buat_item(_cari_posisi_kosong(), Color(1, 0, 0), Vector3(0.5, 0.5, 0.5)))
+
+for i in range(4):
+_buat_pintu(_cari_posisi_kosong())
 
 func _cari_posisi_kosong():
-return Vector3(randf_range(-35, 35), 1, randf_range(-35, 35))
+return Vector3(randf_range(-20, 20), 1, randf_range(-20, 20))
 
 func _buat_monster(warna, pos):
 var m = CharacterBody3D.new()
@@ -176,17 +144,41 @@ m.add_child(mesh)
 add_child(m)
 return m
 
+func _buat_pintu(pos):
+var pintu = StaticBody3D.new()
+pintu.position = pos
+var col = CollisionShape3D.new()
+var shape = BoxShape3D.new()
+shape.size = Vector3(4, 4, 0.5)
+col.shape = shape
+pintu.add_child(col)
+
+var mesh = MeshInstance3D.new()
+var box = BoxMesh.new()
+box.size = Vector3(4, 4, 0.5)
+mesh.mesh = box
+var mat = StandardMaterial3D.new()
+mat.albedo_color = Color(0.4, 0.2, 0.1)
+mesh.material_override = mat
+pintu.add_child(mesh)
+
+pintu.set_meta("is_pintu", true)
+pintu.set_meta("terbuka", false)
+add_child(pintu)
+daftar_pintu.append(pintu)
+
 func _setup_ui():
 var ui_layer = CanvasLayer.new()
 add_child(ui_layer)
 
-# Efek Darah Tepi Layar
+# Efek Darah Tepi Layar (Paling Belakang)
 ui_damage = ColorRect.new()
 ui_damage.color = Color(1, 0, 0, 0)
 ui_damage.set_anchors_preset(Control.PRESET_FULL_RECT)
+ui_damage.mouse_filter = Control.MOUSE_FILTER_IGNORE
 ui_layer.add_child(ui_damage)
 
-# Visual Bars (Kotak UI)
+# Visual Bars
 bar_hp = ColorRect.new()
 bar_hp.color = Color(1, 0, 0)
 bar_hp.position = Vector2(20, 20)
@@ -218,17 +210,10 @@ ui_objektif.add_theme_font_size_override("font_size", 16)
 ui_objektif.text = "Kumpulkan 3 Sekring! (0/3)"
 ui_layer.add_child(ui_objektif)
 
-ui_lore = Label.new()
-ui_lore.position = Vector2(50, get_viewport().size.y / 2)
-ui_lore.add_theme_font_size_override("font_size", 20)
-ui_lore.add_theme_color_override("font_color", Color(1, 1, 0.5))
-ui_lore.size.x = get_viewport().size.x - 100
-ui_lore.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-ui_layer.add_child(ui_lore)
-
 ui_jumpscare = ColorRect.new()
 ui_jumpscare.color = Color(1, 0, 0, 0)
 ui_jumpscare.set_anchors_preset(Control.PRESET_FULL_RECT)
+ui_jumpscare.mouse_filter = Control.MOUSE_FILTER_IGNORE
 ui_layer.add_child(ui_jumpscare)
 
 # Tombol UI
@@ -280,16 +265,14 @@ is_touching_joystick = false
 joystick_vector = Vector2.ZERO
 
 func _process(delta):
-if is_game_over: return
+if is_game_over or not player: return
 
 # --- GERAKAN PEMAIN & ADRENALIN ---
 var current_speed = 4.0
 var is_moving = joystick_vector.length() > 0.1
 
-# Efek Adrenalin (HP Rendah = Jalan Lebih Cepat)
 if health < 30.0:
 current_speed = 4.5
-# Layar berdenyut merah
 ui_damage.color = Color(1, 0, 0, 0.3 + sin(Time.get_ticks_msec() * 0.01) * 0.2)
 else:
 ui_damage.color = Color(1, 0, 0, (100.0 - health) / 200.0)
@@ -322,7 +305,7 @@ senter.visible = false
 else:
 sanity -= 3.0 * delta 
 
-# --- UPDATE UI BARS (Lebar Bar Berubah) ---
+# --- UPDATE UI BARS ---
 bar_hp.size.x = (health / 100.0) * 200
 bar_stamina.size.x = (stamina / 100.0) * 200
 bar_baterai.size.x = (baterai / 100.0) * 200
@@ -330,10 +313,9 @@ bar_baterai.size.x = (baterai / 100.0) * 200
 if sanity <= 0: _game_over("Kamu Gila!")
 if health <= 0: _game_over("Kamu Mati!")
 
-# --- LOGIKA GENERATOR & INTERAKSI PINTU ---
+# --- LOGIKA GENERATOR & INTERAKSI ---
 if is_interacting:
-# Interaksi Generator
-if not generator_nyala and sekring_didapat >= 3:
+if not generator_nyala and sekring_didapat >= 3 and generator:
 if player.position.distance_to(generator.position) < 3.0:
 progress_generator += 20.0 * delta
 ui_objektif.text = "Menyalakan Generator... " + str(int(progress_generator)) + "%"
@@ -341,28 +323,24 @@ if progress_generator >= 100:
 generator_nyala = true
 generator.get_child(0).material_override.albedo_color = Color(0, 1, 0)
 ui_objektif.text = "Generator Menyala! Menuju Pintu Keluar Hijau!"
-pintu_keluar.position.y = 100
+if pintu_keluar: pintu_keluar.position.y = 100
 
-# Interaksi Pintu (Buka/Tutup)
 for p in daftar_pintu:
 if is_instance_valid(p) and player.position.distance_to(p.position) < 3.0:
 var terbuka = p.get_meta("terbuka")
-if not terbuka:
-# Buka pintu (Rotasi 90 derajat)
 var tween = create_tween()
+if not terbuka:
 tween.tween_property(p, "rotation:y", deg_to_rad(90), 0.5)
 p.set_meta("terbuka", true)
 else:
-# Tutup pintu
-var tween = create_tween()
 tween.tween_property(p, "rotation:y", 0.0, 0.5)
 p.set_meta("terbuka", false)
-is_interacting = false # Reset agar tidak berkedip terus
+is_interacting = false 
 
-# --- AI MONSTER UTAMA (The Stalker) ---
+# --- AI MONSTER ---
+if monster and player:
 var jarak_ke_player = monster.position.distance_to(player.position)
 var arah_flat = (player.position - monster.position).normalized()
-_putar_suara_jantung(delta, jarak_ke_player)
 
 if monster_stun_time > 0:
 monster_stun_time -= delta
@@ -377,8 +355,16 @@ var arah_target = (monster_target_pos - monster.position).normalized()
 monster.velocity = Vector3(arah_target.x, 0, arah_target.z) * 1.5
 monster.move_and_slide()
 
-# --- AI MIMIC & PATUNG & BLIND ONE (Logika Tetap Sama) ---
-if mimic:
+if jarak_ke_player < 1.5 and not is_sembunyi and monster_stun_time <= 0:
+health -= 25.0
+monster_stun_time = 1.5
+var tween = create_tween()
+tween.tween_property(camera, "rotation:z", deg_to_rad(5), 0.1)
+tween.tween_property(camera, "rotation:z", deg_to_rad(-5), 0.1)
+tween.tween_property(camera, "rotation:z", 0, 0.1)
+
+# --- AI MIMIC ---
+if mimic and player:
 var jarak_mimic = mimic.position.distance_to(player.position)
 if not mimic_aktif and jarak_mimic < 8.0:
 mimic_aktif = true
@@ -393,7 +379,8 @@ mimic_aktif = false
 mimic.get_child(1).material_override.albedo_color = Color(0, 0.2, 0.8)
 mimic.move_and_slide()
 
-if patung:
+# --- AI WEEPING ANGEL ---
+if patung and player:
 var jarak_patung = patung.position.distance_to(player.position)
 var kamera_maju = -camera.global_transform.basis.z
 var arah_ke_patung = (patung.position - camera.global_position).normalized()
@@ -410,7 +397,8 @@ patung.velocity = Vector3.ZERO
 patung.move_and_slide()
 if jarak_patung < 1.5 and not is_sembunyi: _jumpscare()
 
-if monster_buta:
+# --- AI BLIND ONE ---
+if monster_buta and player:
 var jarak_buta = monster_buta.position.distance_to(player.position)
 var arah_buta = (player.position - monster_buta.position).normalized()
 if (is_moving and not is_sembunyi) or batu_dilempar != null:
@@ -429,15 +417,6 @@ if batu_dilempar.position.y <= 0.5:
 batu_dilempar.queue_free()
 batu_dilempar = null
 
-# Cek Tabrakan Stalker
-if jarak_ke_player < 1.5 and not is_sembunyi and monster_stun_time <= 0:
-health -= 25.0
-monster_stun_time = 1.5
-var tween = create_tween()
-tween.tween_property(camera, "rotation:z", deg_to_rad(5), 0.1)
-tween.tween_property(camera, "rotation:z", deg_to_rad(-5), 0.1)
-tween.tween_property(camera, "rotation:z", 0, 0.1)
-
 # --- LOGIKA OBJEKTIF & ITEM ---
 for s in daftar_sekring:
 if is_instance_valid(s) and player.position.distance_to(s.position) < 2.0:
@@ -455,9 +434,7 @@ health = clamp(health + 50.0, 0, 100)
 if generator_nyala and pintu_keluar and player.position.distance_to(pintu_keluar.position) < 4.0:
 _menang()
 
-func _interaksi():
-# Fungsi ini dipanggil saat tombol interaksi ditahan (is_interacting = true)
-pass
+func _interaksi(): pass
 
 func _lempat_batu():
 if batu_dilempar == null and not is_game_over:
@@ -506,36 +483,8 @@ mimic.get_child(1).material_override.albedo_color = Color(0, 0.2, 0.8)
 elif result.collider == monster_buta:
 monster_buta.position += (monster_buta.position - player.position).normalized() * 10.0
 
-func _putar_suara_jantung(delta, jarak):
-var heart_speed = clamp(1.0 / (jarak + 0.1), 0.5, 5.0)
-heart_timer -= delta * heart_speed
-var frames = playback.get_frames_available()
-
-# Logika Geraman (Growl) saat monster dekat
-growl_timer -= delta
-if jarak < 15.0:
-if growl_timer <= 0:
-growl_timer = 2.0 # Geram setiap 2 detik
-
-for i in range(frames):
-var sample = 0.0
-if heart_timer > 0.0 and heart_timer < 0.2:
-sample += sin(Time.get_ticks_msec() * 0.05) * 0.5 
-
-# Suara Geraman Frekuensi Rendah (Noise)
-if jarak < 15.0 and growl_timer > 1.5:
-sample += randf_range(-0.2, 0.2) # Static noise
-
-playback.push_frame(Vector2(sample, sample))
-
-if heart_timer <= 0.0: heart_timer = 1.0
-
 func _jumpscare():
 is_game_over = true
-var frames = playback.get_frames_available()
-for i in range(frames):
-var sample = sin(Time.get_ticks_msec() * 0.8) * 0.8
-playback.push_frame(Vector2(sample, sample))
 var tween = create_tween()
 tween.tween_property(ui_jumpscare, "color", Color(1, 0, 0, 1), 0.1)
 tween.tween_property(camera, "rotation:z", deg_to_rad(10), 0.05)
@@ -555,7 +504,6 @@ ui_objektif.text = "SELAMAT! Kamu Berhasil Kabur!"
 await get_tree().create_timer(4.0).timeout
 get_tree().reload_current_scene()
 
-# --- MAP GENERATOR & ASSET ---
 func _buat_item(pos, warna, ukuran):
 var item = MeshInstance3D.new()
 var mesh = BoxMesh.new()
@@ -573,14 +521,15 @@ return item
 func _buat_lantai():
 var lantai = MeshInstance3D.new()
 var mesh_lantai = PlaneMesh.new()
-mesh_lantai.size = Vector2(150, 150)
+mesh_lantai.size = Vector2(100, 100)
 lantai.mesh = mesh_lantai
 var mat = StandardMaterial3D.new()
 mat.albedo_color = Color(0.1, 0.1, 0.1)
 lantai.material_override = mat
 add_child(lantai)
 
-var grid_size = 15
+# --- MAZE GENERATOR (Diperkecil jadi 9x9 agar tidak freeze) ---
+var grid_size = 9
 var grid = []
 var cell_size = 6
 var mat_dinding = null
@@ -612,6 +561,7 @@ grid[int((current.x + next.x) / 2)][int((current.y + next.y) / 2)] = 0
 stack.append(next)
 else:
 stack.pop_back()
+
 for x in range(grid_size):
 for z in range(grid_size):
 if grid[x][z] == 1:
