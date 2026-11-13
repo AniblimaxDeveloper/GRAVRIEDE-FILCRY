@@ -30,6 +30,16 @@ jobs:
           use-dotnet: false
           include-templates: true
 
+      - name: Configure Godot Editor Settings
+        run: |
+          # Pastikan folder konfigurasi Godot ada
+          mkdir -p ~/.config/godot
+          # Tulis pengaturan path Java dan Android SDK secara langsung ke file Godot
+          echo '[gd_resource type="EditorSettings" format=3]' > ~/.config/godot/editor_settings-4.3.tres
+          echo '[resource]' >> ~/.config/godot/editor_settings-4.3.tres
+          echo 'export/android/java_sdk_path = "'$JAVA_HOME'"' >> ~/.config/godot/editor_settings-4.3.tres
+          echo 'export/android/android_sdk_path = "'$ANDROID_HOME'"' >> ~/.config/godot/editor_settings-4.3.tres
+
       - name: Generate Debug Keystore
         run: |
           keytool -keyalg RSA -genkeypair -alias androiddebugkey -keypass android -keystore debug.keystore -storepass android -dname "CN=Android Debug,O=Android,C=US" -validity 9999 -deststoretype pkcs12
@@ -37,11 +47,7 @@ jobs:
       - name: Export APK
         run: |
           mkdir -p build
-          # Suntikkan path Java dan Android SDK secara paksa ke Godot
-          godot --headless --verbose \
-            --editor-settings "export/android/java_sdk_path=$JAVA_HOME" \
-            --editor-settings "export/android/android_sdk_path=$ANDROID_HOME" \
-            --export-debug "Android" build/GRAVRIEDE-FILCRY.apk
+          godot --headless --verbose --export-debug "Android" build/GRAVRIEDE-FILCRY.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
