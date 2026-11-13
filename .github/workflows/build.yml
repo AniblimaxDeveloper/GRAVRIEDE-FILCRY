@@ -8,30 +8,21 @@ on:
 jobs:
   build-android:
     runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.3
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Setup Godot
-        uses: chickensoft-games/setup-godot@v1
-        with:
-          version: 4.3.0
-          use-dotnet: false
-          include-templates: true
+      - name: Setup Export Templates
+        run: |
+          mkdir -v -p ~/.local/share/godot/export_templates/
+          mv /root/.local/share/godot/export_templates/4.3.stable ~/.local/share/godot/export_templates/4.3.stable
 
       - name: Export APK
         run: |
           mkdir -p build
-          # Perintah ekspor yang benar untuk Android
+          # Perintah ekspor menggunakan Godot di dalam Docker
           godot --headless --export-debug "Android" build/GRAVRIEDE-FILCRY.apk
 
       - name: Upload APK
