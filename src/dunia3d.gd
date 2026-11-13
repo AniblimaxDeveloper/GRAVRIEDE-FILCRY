@@ -6,18 +6,22 @@ var player = null
 var camera = null
 var senter = null
 var monster = null
-var objek_kunci = null
+var sekring = null
+var pintu_keluar = null
 var is_walking = false
 var is_sprinting = false
 var tap_count = 0
 
 # Survival Stats
 var ui_status = null
+var ui_objektif = null
 var ui_jumpscare = null
 var sanity = 100.0
 var baterai = 100.0
 var stamina = 100.0
+var amunisi = 3
 var is_game_over = false
+var punya_sekring = false
 
 # Audio Jantung
 var audio_player = null
@@ -31,20 +35,18 @@ var env = Environment.new()
 env.background_mode = Environment.BG_COLOR
 env.background_color = Color(0, 0, 0)
 env.fog_enabled = true
-env.fog_density = 0.05
-env.fog_light_color = Color(0.1, 0.1, 0.1)
+env.fog_density = 0.06
+env.fog_light_color = Color(0.05, 0.05, 0.05)
 var world_env = WorldEnvironment.new()
 world_env.environment = env
 add_child(world_env)
 
-# 2. Setup Audio Jantung (Procedural)
+# 2. Setup Audio & Map
 _setup_audio()
-
-# 3. Membangun Map Labirin Acak
 _buat_lantai()
 _buat_labirin_acak()
 
-# 4. Player
+# 3. Player & Kamera
 player = CharacterBody3D.new()
 player.position = Vector3(0, 1.5, 5)
 var col_player = CollisionShape3D.new()
@@ -52,7 +54,6 @@ col_player.shape = CapsuleShape3D.new()
 player.add_child(col_player)
 add_child(player)
 
-# 5. Kamera & Senter
 camera = Camera3D.new()
 camera.current = true
 player.add_child(camera)
@@ -60,11 +61,10 @@ player.add_child(camera)
 senter = SpotLight3D.new()
 senter.light_energy = 3.0
 senter.spot_range = 15.0
-senter.spot_angle = 30.0
 senter.visible = false 
 camera.add_child(senter)
 
-# 6. Monster
+# 4. Monster
 monster = CharacterBody3D.new()
 monster.position = Vector3(0, 1, -20)
 var col_monster = CollisionShape3D.new()
@@ -81,18 +81,17 @@ mesh_monster.material_override = mat_monster
 monster.add_child(mesh_monster)
 add_child(monster)
 
-# 7. Objek Kunci & Baterai
-objek_kunci = _buat_item(Vector3(15, 1, -20), Color(0, 0.5, 1)) 
-_buat_item(Vector3(-10, 1, -5), Color(0, 1, 0))
-_buat_item(Vector3(10, 1, -15), Color(0, 1, 0))
+# 5. Objek: Sekring (Merah), Pintu (Hijau), Baterai (Hijau Kecil)
+sekring = _buat_item(Vector3(15, 1, -20), Color(1, 0, 0), Vector3(0.5, 0.5, 0.5))
+pintu_keluar = _buat_item(Vector3(-20, 2, 20), Color(0, 1, 0), Vector3(4, 4, 1))
+_buat_item(Vector3(-10, 1, -5), Color(0, 0.5, 0), Vector3(0.5, 0.5, 0.5)) # Baterai
 
-# 8. Cahaya Lingkungan Redup
+# 6. Cahaya & UI
 var cahaya = DirectionalLight3D.new()
 cahaya.rotation_degrees = Vector3(-45, -30, 0)
 cahaya.light_energy = 0.05
 add_child(cahaya)
 
-# 9. Setup UI
 _setup_ui()
 
 func _setup_audio():
@@ -109,17 +108,22 @@ var ui_layer = CanvasLayer.new()
 add_child(ui_layer)
 
 ui_status = Label.new()
-ui_status.text = "Sanity: 100% | Baterai: 100% | Stamina: 100%"
 ui_status.position = Vector2(10, 10)
 ui_status.add_theme_font_size_override("font_size", 18)
 ui_layer.add_child(ui_status)
+
+ui_objektif = Label.new()
+ui_objektif.position = Vector2(10, 40)
+ui_objektif.add_theme_font_size_override("font_size", 16)
+ui_objektif.text = "Cari Sekring Merah!"
+ui_layer.add_child(ui_objektif)
 
 ui_jumpscare = ColorRect.new()
 ui_jumpscare.color = Color(1, 0, 0, 0)
 ui_jumpscare.set_anchors_preset(Control.PRESET_FULL_RECT)
 ui_layer.add_child(ui_jumpscare)
 
-# Tombol Sprint (Kanan Bawah)
+# Tombol SPRINT & TEMBAK
 var btn_sprint = Button.new()
 btn_sprint.text = "SPRINT"
 btn_sprint.size = Vector2(100, 100)
@@ -128,10 +132,44 @@ btn_sprint.button_down.connect(func(): is_sprinting = true)
 btn_sprint.button_up.connect(func(): is_sprinting = false)
 ui_layer.add_child(btn_sprint)
 
-func _buat_item(pos, warna):
+var btn_tembak = Button.new()
+btn_tembak.text = "TEMBAK"
+btn_tembak.size = Vector2(100, 100)
+btn_tembak.position = Vector2(get_viewport().size.x - 240, get_viewport().size.y - 150)
+btn_tembak.pressed.connect(_tembak)
+ui_layer.add_child(btn_tembak)
+
+func _tembak():
+if amunisi <= 0 or is_game_over: return
+amunisi -= 1
+
+# Efek Kilatan (Muzzle Flash sederhana)
+senter.light_energy = 10.0
+await get_tree().create_timer(0.1).timeout
+senter.light_energy = 3.0
+
+# Logika Raycast (Tembakan Laser tak terlihat)
+var space_state = get_world_3d().direct_space_state
+var origin = camera.global_position
+var end = -camera.global_transform.basis.z * 50.0 # Tembak sejauh 50 meter
+var query = PhysicsRayQueryParameters3D.create(origin, end)
+var result = space_state.intersect_ray(query)
+
+if result:
+var collider = result.collider
+# Jika yang ditembak adalah monster
+if collider == monster:
+print("Monster Terkena Tembakan!")
+# Pentalan monster (mundur)
+var arah_mundur = (monster.position - player.position).normalized()
+monster.position += arah_mundur * 10.0
+# Efek Monster pingsan sementara
+monster.velocity = Vector3.ZERO
+
+func _buat_item(pos, warna, ukuran):
 var item = MeshInstance3D.new()
 var mesh = BoxMesh.new()
-mesh.size = Vector3(0.5, 0.5, 0.5)
+mesh.size = ukuran
 item.mesh = mesh
 item.position = pos
 var mat = StandardMaterial3D.new()
@@ -152,25 +190,18 @@ mat.albedo_color = Color(0.1, 0.1, 0.1)
 lantai.material_override = mat
 add_child(lantai)
 
-# --- ALGORITMA LABIRIN ACAK ---
 func _buat_labirin_acak():
 var grid_size = 10
 var cell_size = 4
-var dinding_material = StandardMaterial3D.new()
-dinding_material.albedo_color = Color(0.3, 0.3, 0.3)
-
-# Buat dinding luar
+var mat_dinding = StandardMaterial3D.new()
+mat_dinding.albedo_color = Color(0.2, 0.2, 0.2)
 for i in range(-grid_size, grid_size + 1):
-_buat_dinding(Vector3(i * cell_size, 2, -grid_size * cell_size), dinding_material)
-_buat_dinding(Vector3(i * cell_size, 2, grid_size * cell_size), dinding_material)
-_buat_dinding(Vector3(-grid_size * cell_size, 2, i * cell_size), dinding_material)
-_buat_dinding(Vector3(grid_size * cell_size, 2, i * cell_size), dinding_material)
-
-# Buat dinding acak di dalam (seperti labirin)
+_buat_dinding(Vector3(i * cell_size, 2, -grid_size * cell_size), mat_dinding)
+_buat_dinding(Vector3(i * cell_size, 2, grid_size * cell_size), mat_dinding)
 for x in range(-grid_size + 1, grid_size):
 for z in range(-grid_size + 1, grid_size):
-if randf() < 0.3: # 30% kemungkinan ada dinding
-_buat_dinding(Vector3(x * cell_size, 2, z * cell_size), dinding_material)
+if randf() < 0.3:
+_buat_dinding(Vector3(x * cell_size, 2, z * cell_size), mat_dinding)
 
 func _buat_dinding(pos, material):
 var dinding = StaticBody3D.new()
@@ -180,7 +211,6 @@ var shape = BoxShape3D.new()
 shape.size = Vector3(4, 4, 4)
 col.shape = shape
 dinding.add_child(col)
-
 var mesh = MeshInstance3D.new()
 var box = BoxMesh.new()
 box.size = Vector3(4, 4, 4)
@@ -191,14 +221,12 @@ add_child(dinding)
 
 func _input(event):
 if is_game_over: return
-
 if event is InputEventScreenDrag:
 rotation_y -= event.relative.x * 0.005
 rotation_x -= event.relative.y * 0.005
 rotation_x = clamp(rotation_x, deg_to_rad(-90), deg_to_rad(90))
 player.rotation = Vector3(0, rotation_y, 0)
 camera.rotation = Vector3(rotation_x, 0, 0)
-
 elif event is InputEventScreenTouch:
 if event.pressed:
 is_walking = true
@@ -212,16 +240,14 @@ is_walking = false
 func _process(delta):
 if is_game_over: return
 
-if tap_count > 0 and not is_walking:
-tap_count = 0
+if tap_count > 0 and not is_walking: tap_count = 0
 
-# Logika Kecepatan (Jalan vs Sprint)
 var current_speed = 4.0
 if is_sprinting and stamina > 0:
 current_speed = 7.0
 stamina -= 25.0 * delta
 else:
-stamina += 10.0 * delta # Regen stamina
+stamina += 10.0 * delta
 is_sprinting = false
 
 stamina = clamp(stamina, 0, 100)
@@ -232,12 +258,11 @@ player.velocity.x = -arah_maju.x * current_speed
 player.velocity.z = -arah_maju.z * current_speed
 else:
 player.velocity = Vector3.ZERO
-
 player.move_and_slide()
 
 # Baterai & Sanity
 if senter.visible:
-baterai -= 3.0 * delta
+baterai -= 2.0 * delta
 sanity -= 0.5 * delta
 if baterai <= 0:
 baterai = 0
@@ -245,26 +270,23 @@ senter.visible = false
 else:
 sanity -= 3.0 * delta 
 
-ui_status.text = "Sanity: " + str(int(sanity)) + "% | Baterai: " + str(int(baterai)) + "% | Stamina: " + str(int(stamina)) + "%"
+ui_status.text = "Sanity: " + str(int(sanity)) + "% | Baterai: " + str(int(baterai)) + "% | Stamina: " + str(int(stamina)) + "% | Amunisi: " + str(amunisi)
 
-if sanity <= 0:
-_game_over("Kamu Gila!")
+if sanity <= 0: _game_over("Kamu Gila!")
 
 # --- AI MONSTER ---
 var jarak_ke_player = monster.position.distance_to(player.position)
 var arah_ke_player = (player.position - monster.position).normalized()
 var arah_flat = Vector3(arah_ke_player.x, 0, arah_ke_player.z).normalized()
 
-# Update Suara Jantung berdasarkan jarak
 _putar_suara_jantung(delta, jarak_ke_player)
 
-# Senter berkedip kalau monster dekat
 if jarak_ke_player < 8.0 and senter.visible:
-senter.light_energy = randf_range(0.5, 3.0) # Flicker
+senter.light_energy = randf_range(0.5, 3.0)
 else:
 senter.light_energy = 3.0
 
-if jarak_ke_player < 20.0 and (senter.visible or is_walking):
+if jarak_ke_player < 25.0 and (senter.visible or is_walking):
 monster.velocity = arah_flat * 5.0
 monster.look_at(Vector3(player.position.x, monster.position.y, player.position.z), Vector3.UP)
 else:
@@ -272,37 +294,31 @@ monster.velocity = Vector3(randf_range(-1,1), 0, randf_range(-1,1)) * 1.0
 
 monster.move_and_slide()
 
-if jarak_ke_player < 1.5:
-_jumpscare()
+if jarak_ke_player < 1.5: _jumpscare()
 
-# Ambil Item
-if objek_kunci and player.position.distance_to(objek_kunci.position) < 2.0:
-objek_kunci.queue_free()
-objek_kunci = null
+# --- LOGIKA OBJEKTIF ---
+# 1. Ambil Sekring
+if sekring and player.position.distance_to(sekring.position) < 2.0:
+sekring.queue_free()
+sekring = null
+punya_sekring = true
+ui_objektif.text = "Sekring didapat! Menuju Pintu Keluar Hijau."
+print("Sekring didapat!")
+
+# 2. Menang jika sudah punya sekring dan menyentuh pintu
+if punya_sekring and pintu_keluar and player.position.distance_to(pintu_keluar.position) < 3.0:
 _menang()
 
-for child in get_children():
-if child is MeshInstance3D and child.material_override and child.material_override.albedo_color == Color(0, 1, 0):
-if player.position.distance_to(child.position) < 2.0:
-child.queue_free()
-baterai = clamp(baterai + 40.0, 0, 100)
-
 func _putar_suara_jantung(delta, jarak):
-# Semakin dekat monster, semakin cepat detaknya
 heart_speed = clamp(1.0 / (jarak + 0.1), 0.5, 5.0)
 heart_timer -= delta * heart_speed
-
-# Buat gelombang suara (Sine Wave) secara matematis
 var frames = playback.get_frames_available()
 for i in range(frames):
 var sample = 0.0
 if heart_timer > 0.0 and heart_timer < 0.2:
-# Suara "Tut" (frekuensi rendah)
 sample = sin(Time.get_ticks_msec() * 0.05) * 0.5 
 playback.push_frame(Vector2(sample, sample))
-
-if heart_timer <= 0.0:
-heart_timer = 1.0 # Reset detak
+if heart_timer <= 0.0: heart_timer = 1.0
 
 func _jumpscare():
 is_game_over = true
@@ -322,6 +338,6 @@ get_tree().reload_current_scene()
 
 func _menang():
 is_game_over = true
-ui_status.text = "SELAMAT!\nKamu Kabur!"
+ui_status.text = "SELAMAT!\nKamu Berhasil Kabur!"
 await get_tree().create_timer(4.0).timeout
 get_tree().reload_current_scene()
