@@ -10,39 +10,54 @@ var objek_kunci = null
 var is_walking = false
 var tap_count = 0
 
-# UI & Sanity
-var ui_sanity = null
+# UI & Survival
+var ui_status = null
+var ui_objektif = null
+var ui_jumpscare = null
 var sanity = 100.0
+var baterai = 100.0
 var is_game_over = false
+var is_chased = false
 
 func _ready():
-# 1. Membangun Map (Labirin Sederhana)
+# 1. Lingkungan & Kabut (Fog)
+var env = Environment.new()
+env.background_mode = Environment.BG_COLOR
+env.background_color = Color(0, 0, 0) # Hitam pekat
+env.fog_enabled = true
+env.fog_density = 0.05 # Kabut tebal
+env.fog_light_color = Color(0.1, 0.1, 0.1)
+var world_env = WorldEnvironment.new()
+world_env.environment = env
+add_child(world_env)
+
+# 2. Membangun Map
 _buat_lantai()
 _buat_dinding()
 
-# 2. Membuat Player
+# 3. Player
 player = CharacterBody3D.new()
 player.position = Vector3(0, 1.5, 5)
 var col_player = CollisionShape3D.new()
-var shape_player = CapsuleShape3D.new()
-col_player.shape = shape_player
+col_player.shape = CapsuleShape3D.new()
 player.add_child(col_player)
 add_child(player)
 
-# 3. Kamera & Senter Player
+# 4. Kamera & Senter
 camera = Camera3D.new()
 camera.current = true
 player.add_child(camera)
 
 senter = SpotLight3D.new()
-senter.light_energy = 2.0
-senter.spot_range = 20.0
+senter.light_energy = 3.0
+senter.spot_range = 15.0
+senter.spot_angle = 30.0
 senter.visible = false 
 camera.add_child(senter)
 
-# 4. Monster
+# 5. Monster (Kotak Merah)
 monster = CharacterBody3D.new()
-monster.position = Vector3(0, 1, -15)
+monster.position = Vector3(0, 1, -20)
 var col_monster = CollisionShape3D.new()
 col_monster.shape = CapsuleShape3D.new()
 monster.add_child(col_monster)
@@ -52,88 +67,99 @@ var box_mesh = BoxMesh.new()
 box_mesh.size = Vector3(1, 2, 1)
 mesh_monster.mesh = box_mesh
 var mat_monster = StandardMaterial3D.new()
-mat_monster.albedo_color = Color(0.8, 0, 0) # Merah Darah
+mat_monster.albedo_color = Color(0.8, 0, 0)
 mesh_monster.material_override = mat_monster
 monster.add_child(mesh_monster)
 add_child(monster)
 
-# 5. Objek Kunci (Kubus Biru)
-objek_kunci = MeshInstance3D.new()
-var mesh_kunci = BoxMesh.new()
-mesh_kunci.size = Vector3(0.5, 0.5, 0.5)
-objek_kunci.mesh = mesh_kunci
-objek_kunci.position = Vector3(15, 1, -20) # Sembunyikan di pojok map
-var mat_kunci = StandardMaterial3D.new()
-mat_kunci.albedo_color = Color(0, 0.5, 1) # Biru
-mat_kunci.emission_enabled = true
-mat_kunci.emission = Color(0, 0.5, 1)
-objek_kunci.material_override = mat_kunci
-add_child(objek_kunci)
+# 6. Objek Kunci (Kubus Biru)
+objek_kunci = _buat_item(Vector3(15, 1, -20), Color(0, 0.5, 1)) # Kunci
 
-# 6. Cahaya Lingkungan (Gelap)
+# 7. Item Baterai (Kotak Hijau)
+_buat_item(Vector3(-10, 1, -5), Color(0, 1, 0))
+_buat_item(Vector3(10, 1, -15), Color(0, 1, 0))
+_buat_item(Vector3(-15, 1, -20), Color(0, 1, 0))
+
+# 8. Cahaya Lingkungan (Sangat Redup)
 var cahaya = DirectionalLight3D.new()
 cahaya.rotation_degrees = Vector3(-45, -30, 0)
-cahaya.light_energy = 0.15
+cahaya.light_energy = 0.05
 add_child(cahaya)
 
-# 7. Setup UI (Sanity & Objektif)
+# 9. Setup UI
+_setup_ui()
+
+func _setup_ui():
 var ui_layer = CanvasLayer.new()
 add_child(ui_layer)
 
-ui_sanity = Label.new()
-ui_sanity.text = "Sanity: 100%"
-ui_sanity.position = Vector2(20, 20)
-ui_sanity.add_theme_font_size_override("font_size", 24)
-ui_layer.add_child(ui_sanity)
+ui_status = Label.new()
+ui_status.text = "Sanity: 100% | Baterai: 100%"
+ui_status.position = Vector2(20, 20)
+ui_status.add_theme_font_size_override("font_size", 20)
+ui_layer.add_child(ui_status)
 
-var ui_obj = Label.new()
-ui_obj.text = "Objektif: Temukan Kubus Biru"
-ui_obj.position = Vector2(20, 60)
-ui_obj.add_theme_font_size_override("font_size", 18)
-ui_layer.add_child(ui_obj)
+ui_objektif = Label.new()
+ui_objektif.text = "Cari Kunci Biru. Ambil Baterai Hijau."
+ui_objektif.position = Vector2(20, 50)
+ui_objektif.add_theme_font_size_override("font_size", 16)
+ui_layer.add_child(ui_objektif)
 
-# --- Fungsi Pembuat Map ---
+# Efek Jumpscare (Layar Merah Darah)
+ui_jumpscare = ColorRect.new()
+ui_jumpscare.color = Color(1, 0, 0, 0) # Transparan
+ui_jumpscare.set_anchors_preset(Control.PRESET_FULL_RECT)
+ui_layer.add_child(ui_jumpscare)
+
+func _buat_item(pos, warna):
+var item = MeshInstance3D.new()
+var mesh = BoxMesh.new()
+mesh.size = Vector3(0.5, 0.5, 0.5)
+item.mesh = mesh
+item.position = pos
+var mat = StandardMaterial3D.new()
+mat.albedo_color = warna
+mat.emission_enabled = true
+mat.emission = warna
+item.material_override = mat
+add_child(item)
+return item
+
 func _buat_lantai():
 var lantai = MeshInstance3D.new()
 var mesh_lantai = PlaneMesh.new()
 mesh_lantai.size = Vector2(100, 100)
 lantai.mesh = mesh_lantai
 var mat = StandardMaterial3D.new()
-mat.albedo_color = Color(0.1, 0.1, 0.1) # Lantai gelap
+mat.albedo_color = Color(0.1, 0.1, 0.1)
 lantai.material_override = mat
 add_child(lantai)
 
 func _buat_dinding():
-# Membuat dinding kotak-kotak di sekitar map
 var posisi_dinding = [
 Vector3(0, 2, -25), Vector3(10, 2, -25), Vector3(-10, 2, -25),
 Vector3(20, 2, -10), Vector3(-20, 2, -10),
 Vector3(5, 2, -10), Vector3(-5, 2, -10),
 Vector3(15, 2, 0), Vector3(-15, 2, 0)
 ]
-
 for pos in posisi_dinding:
 var dinding = StaticBody3D.new()
 dinding.position = pos
-
 var col = CollisionShape3D.new()
 var shape = BoxShape3D.new()
 shape.size = Vector3(4, 4, 4)
 col.shape = shape
 dinding.add_child(col)
-
 var mesh = MeshInstance3D.new()
 var box = BoxMesh.new()
 box.size = Vector3(4, 4, 4)
 mesh.mesh = box
 var mat = StandardMaterial3D.new()
-mat.albedo_color = Color(0.3, 0.3, 0.3) # Warna beton
+mat.albedo_color = Color(0.3, 0.3, 0.3)
 mesh.material_override = mat
 dinding.add_child(mesh)
-
 add_child(dinding)
 
-# --- Kontrol & Logika ---
 func _input(event):
 if is_game_over: return
 
@@ -171,50 +197,89 @@ player.velocity = Vector3.ZERO
 
 player.move_and_slide()
 
-# Logika Sanity Menurun
-sanity -= 2.0 * delta
-if ui_sanity:
-ui_sanity.text = "Sanity: " + str(int(sanity)) + "%"
+# --- LOGIKA BATERAI ---
+if senter.visible:
+baterai -= 3.0 * delta # Baterai berkurang 3% per detik
+if baterai <= 0:
+baterai = 0
+senter.visible = false # Senter mati otomatis
+
+# --- LOGIKA SANITY ---
+# Sanity menurun cepat kalau gelap, menurun lambat kalau senter nyala
+if senter.visible:
+sanity -= 0.5 * delta
+else:
+sanity -= 3.0 * delta 
+
+# Update UI
+ui_status.text = "Sanity: " + str(int(sanity)) + "% | Baterai: " + str(int(baterai)) + "%"
 
 if sanity <= 0:
 _game_over("Kamu Gila karena Ketakutan!")
 
-# --- AI Monster ---
+# --- AI MONSTER (Stealth System) ---
 var jarak_ke_player = monster.position.distance_to(player.position)
 var arah_ke_player = (player.position - monster.position).normalized()
-var arah_ke_player_flat = Vector3(arah_ke_player.x, 0, arah_ke_player.z).normalized()
+var arah_flat = Vector3(arah_ke_player.x, 0, arah_ke_player.z).normalized()
 
-if jarak_ke_player < 15.0: # Jika dekat, kejar!
-monster.velocity = arah_ke_player_flat * 4.5 # Kecepatan ngejar
+# Monster bisa melihatmu jika jarak < 20 DAN (Senter nyala ATAU kamu sedang jalan)
+if jarak_ke_player < 20.0 and (senter.visible or is_walking):
+is_chased = true
+elif jarak_ke_player > 25.0:
+is_chased = false # Kabur
+
+if is_chased:
+monster.velocity = arah_flat * 5.0 # Kejar cepat
 monster.look_at(Vector3(player.position.x, monster.position.y, player.position.z), Vector3.UP)
 else:
-# Patroli malas (jalan acak)
+# Patroli malas
 monster.velocity = Vector3(randf_range(-1,1), 0, randf_range(-1,1)) * 1.0
 
 monster.move_and_slide()
 
-# Cek Tabrakan Monster vs Player
+# Cek Tabrakan Monster vs Player (JUMPSCARE)
 if jarak_ke_player < 1.5:
-_game_over("Kamu Tertangkap Monster!")
+_jumpscare()
 
-# Cek Ambil Kunci
+# Cek Ambil Item
 if objek_kunci and player.position.distance_to(objek_kunci.position) < 2.0:
 objek_kunci.queue_free()
 objek_kunci = null
 _menang()
 
+# Cek Ambil Baterai (Mencari node anak yang warnanya hijau)
+for child in get_children():
+if child is MeshInstance3D and child.material_override and child.material_override.albedo_color == Color(0, 1, 0):
+if player.position.distance_to(child.position) < 2.0:
+child.queue_free()
+baterai = clamp(baterai + 40.0, 0, 100)
+print("Baterai ditemukan!")
+
+func _jumpscare():
+is_game_over = true
+print("JUMPSCARE!")
+
+# Animasi Jumpscare (Layar Merah & Guncangan)
+var tween = create_tween()
+tween.tween_property(ui_jumpscare, "color", Color(1, 0, 0, 1), 0.1) # Kedip Merah
+tween.tween_property(camera, "rotation:z", deg_to_rad(5), 0.05) # Getar
+tween.tween_property(camera, "rotation:z", deg_to_rad(-5), 0.05)
+tween.tween_property(camera, "rotation:z", 0, 0.05)
+
+ui_status.text = "TERTANGKAP!"
+await get_tree().create_timer(2.0).timeout
+get_tree().reload_current_scene()
+
 func _game_over(pesan):
 is_game_over = true
 print("GAME OVER: ", pesan)
-if ui_sanity:
-ui_sanity.text = "GAME OVER\n" + pesan + "\n\nRestarting..."
+ui_status.text = "GAME OVER\n" + pesan
 await get_tree().create_timer(3.0).timeout
 get_tree().reload_current_scene()
 
 func _menang():
 is_game_over = true
 print("KAMU MENANG!")
-if ui_sanity:
-ui_sanity.text = "SELAMAT!\nKamu Menemukan Kunci dan Kabur!\n\nRestarting..."
+ui_status.text = "SELAMAT!\nKamu Menemukan Kunci dan Kabur!"
 await get_tree().create_timer(4.0).timeout
 get_tree().reload_current_scene()
