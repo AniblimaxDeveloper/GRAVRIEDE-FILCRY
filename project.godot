@@ -2,7 +2,7 @@ config_version=5
 
 [application]
 config/name="GRAVRIEDE FILCRY"
-run/main_scene="res://dunia3d.tscn"
+run/main_scene="res://src/dunia3d.tscn"
 
 [rendering]
 renderer/rendering_method="mobile"
