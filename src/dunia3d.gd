@@ -8,22 +8,25 @@ var camera = null
 var senter = null
 var monster = null
 var mimic = null
+var patung = null
 var pintu_keluar = null
 var loker = null
 var medkit = null
 var daftar_sekring = []
+var daftar_catatan = []
 
-# Joystick
+# Joystick & UI
 var joystick_center = Vector2.ZERO
 var joystick_vector = Vector2.ZERO
 var is_touching_joystick = false
 var joystick_radius = 100.0
-
-# Stats
 var ui_status = null
 var ui_objektif = null
 var ui_jumpscare = null
 var ui_damage = null
+var ui_lore = null
+
+# Stats
 var health = 100.0
 var sanity = 100.0
 var baterai = 100.0
@@ -32,17 +35,20 @@ var amunisi = 3
 var sekring_didapat = 0
 var is_game_over = false
 var is_sembunyi = false
+var is_terlihat_patung = false
 
 # Monster AI
 var monster_target_pos = Vector3.ZERO
 var monster_stun_time = 0.0
 var mimic_aktif = false
+var patung_aktif = false
 
 # Audio & Hallucination
 var audio_player = null
 var playback = null
 var heart_timer = 0.0
 var halusinasi_timer = 5.0
+var flicker_timer = 0.0
 
 func _ready():
 # 1. Lingkungan & Kabut
@@ -88,57 +94,57 @@ senter.visible = false
 camera.add_child(senter)
 
 # 4. Monster Utama (The Stalker)
-monster = CharacterBody3D.new()
-monster.position = Vector3(0, 1, -20)
-var col_monster = CollisionShape3D.new()
-col_monster.shape = CapsuleShape3D.new()
-monster.add_child(col_monster)
-
-var mesh_monster = MeshInstance3D.new()
-var box_mesh = BoxMesh.new()
-box_mesh.size = Vector3(1, 2, 1)
-mesh_monster.mesh = box_mesh
-var mat_monster = StandardMaterial3D.new()
-mat_monster.albedo_color = Color(0.8, 0, 0)
-mesh_monster.material_override = mat_monster
-monster.add_child(mesh_monster)
-add_child(monster)
+monster = _buat_monster(Color(0.8, 0, 0), Vector3(0, 1, -20))
 
 # 5. Monster Kedua (The Mimic - Kotak Biru)
-mimic = CharacterBody3D.new()
-mimic.position = Vector3(10, 1, -10) # Posisi awal
-var col_mimic = CollisionShape3D.new()
-col_mimic.shape = CapsuleShape3D.new()
-mimic.add_child(col_mimic)
+mimic = _buat_monster(Color(0, 0.2, 0.8), Vector3(10, 1, -10))
 
-var mesh_mimic = MeshInstance3D.new()
-var box_mimic = BoxMesh.new()
-box_mimic.size = Vector3(1, 2, 1)
-mesh_mimic.mesh = box_mimic
-var mat_mimic = StandardMaterial3D.new()
-mat_mimic.albedo_color = Color(0, 0.2, 0.8) # Biru
-mesh_mimic.material_override = mat_mimic
-mimic.add_child(mesh_mimic)
-add_child(mimic)
+# 6. Monster Ketiga (The Weeping Angel - Patung Abu-abu)
+patung = _buat_monster(Color(0.5, 0.5, 0.5), Vector3(-15, 1, -15))
+patung.get_child(1).mesh.size = Vector3(1.5, 2.5, 1.5) # Patung lebih tinggi
 
-# 6. Objek (Pintu, Loker, Medkit)
+# 7. Objek
 pintu_keluar = _buat_item(Vector3(-20, 2, 20), Color(0, 1, 0), Vector3(4, 4, 1))
 loker = _buat_item(Vector3(5, 2, 5), Color(0, 0.5, 1), Vector3(2, 4, 2))
 medkit = _buat_item(Vector3(-5, 1, -10), Color(1, 1, 1), Vector3(0.5, 0.5, 0.5))
 
-# 7. Spawn 3 Sekring Acak
+# 8. Spawn 3 Sekring & 2 Catatan Acak
 for i in range(3):
 var pos_acak = Vector3(randf_range(-30, 30), 1, randf_range(-30, 30))
 daftar_sekring.append(_buat_item(pos_acak, Color(1, 0, 0), Vector3(0.5, 0.5, 0.5)))
 
-# 8. Cahaya Redup
+for i in range(2):
+var pos_acak = Vector3(randf_range(-30, 30), 0.5, randf_range(-30, 30))
+var catatan = _buat_item(pos_acak, Color(1, 1, 0.5), Vector3(0.5, 0.1, 0.5)) # Kuning
+daftar_catatan.append(catatan)
+
+# 9. Cahaya Redup
 var cahaya = DirectionalLight3D.new()
+cahaya.name = "CahayaUtama"
 cahaya.rotation_degrees = Vector3(-45, -30, 0)
 cahaya.light_energy = 0.05
 add_child(cahaya)
 
-# 9. Setup UI
+# 10. Setup UI
 _setup_ui()
+
+func _buat_monster(warna, pos):
+var m = CharacterBody3D.new()
+m.position = pos
+var col = CollisionShape3D.new()
+col.shape = CapsuleShape3D.new()
+m.add_child(col)
+
+var mesh = MeshInstance3D.new()
+var box = BoxMesh.new()
+box.size = Vector3(1, 2, 1)
+mesh.mesh = box
+var mat = StandardMaterial3D.new()
+mat.albedo_color = warna
+mesh.material_override = mat
+m.add_child(mesh)
+add_child(m)
+return m
 
 func _setup_ui():
 var ui_layer = CanvasLayer.new()
@@ -148,6 +154,14 @@ ui_damage = ColorRect.new()
 ui_damage.color = Color(1, 0, 0, 0)
 ui_damage.set_anchors_preset(Control.PRESET_FULL_RECT)
 ui_layer.add_child(ui_damage)
+
+ui_lore = Label.new()
+ui_lore.position = Vector2(50, get_viewport().size.y / 2)
+ui_lore.add_theme_font_size_override("font_size", 20)
+ui_lore.add_theme_color_override("font_color", Color(1, 1, 0.5))
+ui_lore.size.x = get_viewport().size.x - 100
+ui_lore.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+ui_layer.add_child(ui_lore)
 
 var crosshair = Label.new()
 crosshair.text = "+"
@@ -197,13 +211,11 @@ parent.add_child(btn)
 
 func _input(event):
 if is_game_over: return
-
 if event is InputEventScreenDrag:
 if event.position.x < get_viewport().size.x / 2:
 is_touching_joystick = true
 var diff = event.position - joystick_center
-if diff.length() > joystick_radius:
-diff = diff.normalized() * joystick_radius
+if diff.length() > joystick_radius: diff = diff.normalized() * joystick_radius
 joystick_vector = diff / joystick_radius
 else:
 rotation_y -= event.relative.x * 0.005
@@ -211,7 +223,6 @@ rotation_x -= event.relative.y * 0.005
 rotation_x = clamp(rotation_x, deg_to_rad(-90), deg_to_rad(90))
 player.rotation = Vector3(0, rotation_y, 0)
 camera.rotation = Vector3(rotation_x, 0, 0)
-
 elif event is InputEventScreenTouch:
 if not event.pressed:
 if event.position.x < get_viewport().size.x / 2:
@@ -254,18 +265,20 @@ sanity -= 3.0 * delta
 
 # --- UI UPDATE ---
 var hp_text = "HP: " + str(int(health)) + "%"
-ui_status.text = hp_text + " | Sanity: " + str(int(sanity)) + "% | Baterai: " + str(int(baterai)) + "% | Stamina: " + str(int(stamina)) + "% | Amunisi: " + str(amunisi)
+ui_status.text = hp_text + " | Sanity: " + str(int(sanity)) + "% | Baterai: " + str(int(baterai)) + "% | Amunisi: " + str(amunisi)
 ui_damage.color = Color(1, 0, 0, (100.0 - health) / 200.0)
 
 if sanity <= 0: _game_over("Kamu Gila!")
-if health <= 0: _game_over("Kamu Mati Kehabisan Darah!")
+if health <= 0: _game_over("Kamu Mati!")
 
-# --- HALUSINASI (Sanity Rendah) ---
-if sanity < 40.0:
-halusinasi_timer -= delta
-if halusinasi_timer <= 0:
-_halusinasi()
-halusinasi_timer = randf_range(10.0, 20.0) # Halusinasi berikutnya
+# --- EFEK KEDIP LAMPU (FLICKER) ---
+flicker_timer -= delta
+if flicker_timer <= 0:
+var cahaya = get_node_or_null("CahayaUtama")
+if cahaya: cahaya.light_energy = randf_range(0.0, 0.1)
+await get_tree().create_timer(0.1).timeout
+if cahaya: cahaya.light_energy = 0.05
+flicker_timer = randf_range(2.0, 5.0)
 
 # --- AI MONSTER UTAMA (The Stalker) ---
 var jarak_ke_player = monster.position.distance_to(player.position)
@@ -285,37 +298,59 @@ monster.velocity = Vector3.ZERO
 else:
 if is_sembunyi:
 monster.velocity = Vector3.ZERO
-monster.look_at(Vector3(player.position.x, monster.position.y, player.position.z), Vector3.UP)
 elif jarak_ke_player < 25.0 and (senter.visible or joystick_vector.length() > 0.1):
 monster.velocity = arah_flat * 5.0
-monster.look_at(Vector3(player.position.x, monster.position.y, player.position.z), Vector3.UP)
 else:
 if monster.position.distance_to(monster_target_pos) < 2.0 or monster_target_pos == Vector3.ZERO:
 monster_target_pos = Vector3(randf_range(-30, 30), 1, randf_range(-30, 30))
 var arah_target = (monster_target_pos - monster.position).normalized()
 monster.velocity = Vector3(arah_target.x, 0, arah_target.z) * 1.5
-monster.look_at(monster_target_pos, Vector3.UP)
-
 monster.move_and_slide()
 
-# --- AI MIMIC (The Pretender) ---
+# --- AI MIMIC ---
 if mimic:
 var jarak_mimic = mimic.position.distance_to(player.position)
 if not mimic_aktif and jarak_mimic < 8.0:
 mimic_aktif = true
-mimic.get_child(1).material_override.albedo_color = Color(1, 0, 0) # Berubah Merah
-print("MIMIC TERBANGUN!")
+mimic.get_child(1).material_override.albedo_color = Color(1, 0, 0)
 
 if mimic_aktif:
 var arah_mimic = (player.position - mimic.position).normalized()
-mimic.velocity = Vector3(arah_mimic.x, 0, arah_mimic.z) * 6.0 # Sangat cepat
-mimic.look_at(Vector3(player.position.x, mimic.position.y, player.position.z), Vector3.UP)
+mimic.velocity = Vector3(arah_mimic.x, 0, arah_mimic.z) * 6.0
 if jarak_mimic < 1.5 and not is_sembunyi:
 health -= 30.0
-mimic.position = Vector3(randf_range(-30,30), 1, randf_range(-30,30)) # Teleport jauh
+mimic.position = Vector3(randf_range(-30,30), 1, randf_range(-30,30))
 mimic_aktif = false
 mimic.get_child(1).material_override.albedo_color = Color(0, 0.2, 0.8)
 mimic.move_and_slide()
+
+# --- AI WEEPING ANGEL (Patung) ---
+if patung:
+var jarak_patung = patung.position.distance_to(player.position)
+var arah_patung = (player.position - patung.position).normalized()
+
+# Cek apakah player melihat patung (menggunakan arah kamera)
+var kamera_maju = -camera.global_transform.basis.z
+var arah_ke_patung = (patung.position - camera.global_position).normalized()
+var dot_product = kamera_maju.dot(arah_ke_patung)
+
+# Jika dot_product > 0.5, berarti patung ada di depan layar (terlihat)
+if dot_product > 0.5 and senter.visible:
+is_terlihat_patung = true
+else:
+is_terlihat_patung = false
+
+if not is_terlihat_patung:
+# Bergerak cepat saat tidak dilihat
+patung.velocity = Vector3(arah_patung.x, 0, arah_patung.z) * 8.0
+else:
+# Membeku saat dilihat
+patung.velocity = Vector3.ZERO
+
+patung.move_and_slide()
+
+if jarak_patung < 1.5 and not is_sembunyi:
+_jumpscare() # Patung langsung membunuh
 
 # Cek Tabrakan Stalker
 if jarak_ke_player < 1.5 and not is_sembunyi and monster_stun_time <= 0:
@@ -326,7 +361,7 @@ tween.tween_property(camera, "rotation:z", deg_to_rad(5), 0.1)
 tween.tween_property(camera, "rotation:z", deg_to_rad(-5), 0.1)
 tween.tween_property(camera, "rotation:z", 0, 0.1)
 
-# --- LOGIKA OBJEKTIF (3 SEKring) ---
+# --- LOGIKA OBJEKTIF ---
 for s in daftar_sekring:
 if is_instance_valid(s) and player.position.distance_to(s.position) < 2.0:
 s.queue_free()
@@ -334,6 +369,13 @@ sekring_didapat += 1
 ui_objektif.text = "Kumpulkan 3 Sekring Merah! (" + str(sekring_didapat) + "/3)"
 if sekring_didapat >= 3:
 ui_objektif.text = "Semua Sekring didapat! Menuju Pintu Keluar Hijau!"
+
+# Logika Baca Catatan
+for c in daftar_catatan:
+if is_instance_valid(c) and player.position.distance_to(c.position) < 2.0:
+ui_lore.text = "Catatan: 'Mereka bilang ini rumah sakit. Tapi tidak ada pasien... hanya patung...'"
+await get_tree().create_timer(4.0).timeout
+if is_instance_valid(ui_lore): ui_lore.text = ""
 
 if medkit and player.position.distance_to(medkit.position) < 2.0:
 medkit.queue_free()
@@ -343,27 +385,12 @@ health = clamp(health + 50.0, 0, 100)
 if sekring_didapat >= 3 and pintu_keluar and player.position.distance_to(pintu_keluar.position) < 3.0:
 _menang()
 
-func _halusinasi():
-# Efek Visual Jumpscare Palsu
-var frames = playback.get_frames_available()
-for i in range(frames):
-var sample = sin(Time.get_ticks_msec() * 0.8) * 0.5
-playback.push_frame(Vector2(sample, sample))
-
-var tween = create_tween()
-tween.tween_property(ui_jumpscare, "color", Color(1, 0, 0, 0.5), 0.1)
-tween.tween_property(ui_jumpscare, "color", Color(1, 0, 0, 0), 0.2)
-tween.tween_property(camera, "rotation:z", deg_to_rad(15), 0.05)
-tween.tween_property(camera, "rotation:z", deg_to_rad(-15), 0.05)
-tween.tween_property(camera, "rotation:z", 0, 0.05)
-print("HALUSINASI!")
-
 func _sembunyi():
 if loker and player.position.distance_to(loker.position) < 3.0:
 is_sembunyi = not is_sembunyi
 if is_sembunyi:
 player.position = loker.position
-ui_objektif.text = "Kamu Bersembunyi. Tekan [SEMBUNYI] lagi untuk keluar."
+ui_objektif.text = "Kamu Bersembunyi."
 else:
 player.position += Vector3(0, 0, 2)
 ui_objektif.text = "Kumpulkan 3 Sekring Merah! (" + str(sekring_didapat) + "/3)"
@@ -371,7 +398,6 @@ ui_objektif.text = "Kumpulkan 3 Sekring Merah! (" + str(sekring_didapat) + "/3)"
 func _tembak():
 if is_game_over: return
 if amunisi <= 0:
-# Efek Flashbang jika amunisi habis
 senter.light_energy = 20.0
 senter.spot_range = 50.0
 await get_tree().create_timer(0.2).timeout
@@ -393,14 +419,15 @@ var result = space_state.intersect_ray(query)
 
 if result:
 if result.collider == monster:
-var arah_mundur = (monster.position - player.position).normalized()
-monster.position += arah_mundur * 10.0
+monster.position += (monster.position - player.position).normalized() * 10.0
 monster_stun_time = 3.0
 elif result.collider == mimic:
-var arah_mundur = (mimic.position - player.position).normalized()
-mimic.position += arah_mundur * 10.0
+mimic.position += (mimic.position - player.position).normalized() * 10.0
 mimic_aktif = false
 mimic.get_child(1).material_override.albedo_color = Color(0, 0.2, 0.8)
+elif result.collider == patung:
+# Menembak patung tidak berguna, dia hanya mundur sedikit
+patung.position += (patung.position - player.position).normalized() * 5.0
 
 func _putar_suara_jantung(delta, jarak):
 var heart_speed = clamp(1.0 / (jarak + 0.1), 0.5, 5.0)
