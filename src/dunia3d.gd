@@ -1,32 +1,30 @@
 extends Node3D
 
 func _ready():
-print("GAME DIMULAI")
-
 # 1. Kamera
-var kamera = Camera3D.new()
-kamera.position = Vector3(0, 0, 5)
-kamera.current = true
-add_child(kamera)
+var camera = Camera3D.new()
+camera.position = Vector3(0, 0, 5)
+camera.current = true
+add_child(camera)
 
 # 2. Cahaya
-var cahaya = DirectionalLight3D.new()
-cahaya.rotation_degrees = Vector3(-45, 0, 0)
-add_child(cahaya)
+var light = DirectionalLight3D.new()
+light.rotation_degrees = Vector3(-45, 0, 0)
+add_child(light)
 
-# 3. Kotak Biru
-var kotak = MeshInstance3D.new()
-kotak.mesh = BoxMesh.new()
+# 3. Kotak Putih
+var box = MeshInstance3D.new()
+box.mesh = BoxMesh.new()
 var mat = StandardMaterial3D.new()
-mat.albedo_color = Color.BLUE
-kotak.material_override = mat
-add_child(kotak)
+mat.albedo_color = Color.WHITE
+box.material_override = mat
+add_child(box)
 
-# 4. Teks UI
+# 4. Teks
 var ui = CanvasLayer.new()
 add_child(ui)
 var label = Label.new()
-label.text = "GAME BERHASIL DIMUAT!\n(Kotak Biru 3D)"
-label.position = Vector2(50, 50)
-label.add_theme_font_size_override("font_size", 30)
+label.text = "HALO GRAVRIEDE!"
+label.position = Vector2(100, 100)
+label.add_theme_font_size_override("font_size", 40)
 ui.add_child(label)
